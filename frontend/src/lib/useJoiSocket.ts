@@ -2,28 +2,44 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 type Status = "connecting" | "open" | "closed";
 
-export function useJoiSocket(url = "ws://localhost:8000/ws") {
+export function useJoiSocket(
+  onToken: (token: string) => void,
+  url = "ws://localhost:8000/ws"
+) {
   const [status, setStatus] = useState<Status>("connecting");
-  const [lastMessage, setLastMessage] = useState<string>("");
   const wsRef = useRef<WebSocket | null>(null);
+  const onTokenRef = useRef(onToken);
+  onTokenRef.current = onToken;
 
   useEffect(() => {
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    let closed = false;
+    let retry: ReturnType<typeof setTimeout>;
 
-    ws.onopen = () => setStatus("open");
-    ws.onclose = () => setStatus("closed");
-    ws.onerror = () => setStatus("closed");
-    ws.onmessage = (e) => setLastMessage(e.data);
+    const connect = () => {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      setStatus("connecting");
 
-    return () => ws.close();
+      ws.onopen = () => setStatus("open");
+      ws.onmessage = (e) => onTokenRef.current(e.data);
+      ws.onerror = () => ws.close();
+      ws.onclose = () => {
+        setStatus("closed");
+        if (!closed) retry = setTimeout(connect, 1000); // reintenta cada 1s
+      };
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(retry);
+      wsRef.current?.close();
+    };
   }, [url]);
 
   const send = useCallback((msg: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(msg);
-    }
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(msg);
   }, []);
 
-  return { status, lastMessage, send };
+  return { status, send };
 }

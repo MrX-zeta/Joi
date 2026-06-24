@@ -1,0 +1,15 @@
+backend/test_voice.py
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Node / Tauri
+frontend/node_modules/
+frontend/dist/
+frontend/src-tauri/target/
+
+# Pruebas y audio (descartables)
+*.mp3
+backend/test_voice.py

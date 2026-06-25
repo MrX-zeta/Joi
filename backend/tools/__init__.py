@@ -40,10 +40,31 @@ TOOLS = {
                     "properties": {
                         "name": {
                             "type": "string",
-                            "description": "Nombre de la app a abrir, por ejemplo 'spotify' o 'navegador'.",
+                            "description": "Abre o trae al frente un PROGRAMA DE ESCRITORIO: Spotify, Figma, VSCode, Brave, Teams, calculadora. Úsala también cuando Luis diga 'trae al frente' o 'cambia a' una de estas apps. NO la uses para sitios web como Classroom o Gmail.",
                         },
                     },
                     "required": ["name"],
+                },
+            },
+        },
+    },
+    "open_url": {
+        "fn": system.open_url,
+        "requires_confirmation": True,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "open_url",
+                "description": "Abre un sitio web en el navegador de Luis (Classroom, Gmail, GitHub, WhatsApp, etc.). Úsala cuando pida abrir alguno de esos servicios.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "site": {
+                            "type": "string",
+                             "description": "Abre un SITIO WEB dentro del navegador: Classroom, Gmail, GitHub, WhatsApp, YouTube, Drive. Solo para esos sitios. NO la uses para abrir el navegador Brave en sí (para eso usa open_app).",
+                        },
+                    },
+                    "required": ["site"],
                 },
             },
         },

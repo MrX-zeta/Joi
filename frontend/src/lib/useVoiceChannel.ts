@@ -2,12 +2,20 @@ import { useEffect, useRef, useState } from "react";
 
 type Status = "connecting" | "open" | "closed";
 
+type ConfirmRequest = {
+  id: string;
+  tool: string;
+  args: Record<string, unknown>;
+  label: string;
+};
+
 type VoiceHandlers = {
   onTranscript?: (text: string) => void;
   onToken?: (text: string) => void;
   onEnd?: () => void;
   onSpeakingChange?: (speaking: boolean) => void;
   onHistory?: (messages: { role: string; content: string }[]) => void;
+  onConfirmRequest?: (req: ConfirmRequest) => void;
 };
 
 export function useVoiceChannel(
@@ -65,6 +73,13 @@ export function useVoiceChannel(
           if (msg.type === "history") h.current.onHistory?.(msg.messages);
           else if (msg.type === "transcript") h.current.onTranscript?.(msg.text);
           else if (msg.type === "token") h.current.onToken?.(msg.text);
+          else if (msg.type === "confirm_request")
+            h.current.onConfirmRequest?.({
+              id: msg.id,
+              tool: msg.tool,
+              args: msg.args,
+              label: msg.label,
+            });
           else if (msg.type === "end") h.current.onEnd?.();
           // audio_start / audio_end se ignoran: el control de "hablando"
           // lo maneja la cola de reproducción (playNext)
@@ -103,5 +118,11 @@ export function useVoiceChannel(
       ws.send(JSON.stringify({ type: "config", speak }));
   };
 
-  return { status, sendAudio, sendText, sendConfig };
+  const sendConfirm = (id: string, approved: boolean) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: "confirm_response", id, approved }));
+  };
+
+  return { status, sendAudio, sendText, sendConfig, sendConfirm };
 }

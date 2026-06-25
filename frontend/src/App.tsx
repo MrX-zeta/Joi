@@ -5,6 +5,7 @@ import { useVoiceChannel } from "./lib/useVoiceChannel";
 import Aurora, { type AuroraState } from "./components/Aurora";
 import Sidebar, { type Message } from "./components/Sidebar";
 import Dock from "./components/Dock";
+import ConfirmDialog from "./components/ConfirmDialog";
 
 const STATE_LABEL: Record<AuroraState, string> = {
   idle: "en reposo",
@@ -22,6 +23,7 @@ export default function App() {
   const [speaking, setSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [confirmReq, setConfirmReq] = useState<{ id: string; label: string } | null>(null);
 
   const streamingRef = useRef("");
   const speakingRef = useRef(false);
@@ -46,7 +48,7 @@ export default function App() {
     appendToken(token);
   });
 
-  const { status: voiceStatus, sendAudio, sendText, sendConfig } = useVoiceChannel({
+  const { status: voiceStatus, sendAudio, sendText, sendConfig, sendConfirm } = useVoiceChannel({
     onHistory: (hist) => {
       setMessages(
         hist.map((m) => ({
@@ -62,6 +64,7 @@ export default function App() {
       speakingRef.current = s;
       setSpeaking(s);
     },
+    onConfirmRequest: (req) => setConfirmReq({ id: req.id, label: req.label }),
   });
 
   useEffect(() => {
@@ -108,6 +111,11 @@ export default function App() {
     setThinking(true);
     if (voiceEnabled) sendText(text);
     else send(text);
+  };
+
+  const handleConfirm = (id: string, approved: boolean) => {
+    sendConfirm(id, approved);
+    setConfirmReq(null);
   };
 
   const auroraState: AuroraState =
@@ -163,6 +171,9 @@ export default function App() {
         streaming={streaming}
         thinking={thinking}
       />
+
+      {/* Diálogo de confirmación para acciones críticas */}
+      <ConfirmDialog request={confirmReq} onRespond={handleConfirm} />
     </main>
   );
 }

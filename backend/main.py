@@ -1,4 +1,6 @@
 import json
+import asyncio
+import uuid
 from contextlib import asynccontextmanager
 
 import numpy as np
@@ -7,11 +9,16 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 import db
 import conversation
-from llm import stream_reply, warmup
+import tools
+from llm import reply_with_tools, stream_reply, warmup
 from stt import transcribe, warmup_stt
 from tts import synthesize
 
 SENTENCE_ENDS = ".!?…\n"
+
+# Confirmaciones pendientes: id -> asyncio.Future que se resuelve con True/False
+_pending_confirms: dict[str, asyncio.Future] = {}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,6 +47,12 @@ app.add_middleware(
 @app.get("/")
 def health():
     return {"status": "Joi online"}
+
+
+def _confirm_label(name: str, args: dict) -> str:
+    if name == "open_app":
+        return f"¿Abrir {args.get('name', 'la aplicación')}?"
+    return f"¿Confirmas la acción {name}?"
 
 
 # --- Canal de TEXTO (solo texto, sin voz) ---
@@ -74,6 +87,30 @@ async def voice_endpoint(ws: WebSocket):
     history = await run_in_threadpool(db.get_today)
     await ws.send_text(json.dumps({"type": "history", "messages": history}))
     speak = True
+
+    # Ejecuta una tool, pidiendo confirmación al frontend si la tool lo requiere.
+    async def execute_tool(name: str, args: dict) -> str:
+        if tools.requires_confirmation(name):
+            cid = str(uuid.uuid4())
+            fut: asyncio.Future = asyncio.get_event_loop().create_future()
+            _pending_confirms[cid] = fut
+            await ws.send_text(json.dumps({
+                "type": "confirm_request",
+                "id": cid,
+                "tool": name,
+                "args": args,
+                "label": _confirm_label(name, args),
+            }))
+            try:
+                approved = await asyncio.wait_for(fut, timeout=60.0)
+            except asyncio.TimeoutError:
+                approved = False
+            finally:
+                _pending_confirms.pop(cid, None)
+            if not approved:
+                return f"Luis canceló la acción ({name})."
+        return tools.execute(name, args)
+
     try:
         while True:
             msg = await ws.receive()
@@ -91,41 +128,41 @@ async def voice_endpoint(ws: WebSocket):
                     await ws.send_text(json.dumps({"type": "end"}))
                     continue
                 await ws.send_text(json.dumps({"type": "transcript", "text": text}))
-                await handle_turn(ws, text, speak)
+                asyncio.create_task(handle_turn(ws, text, speak, execute_tool))
 
-            # Mensaje JSON: texto escrito o config del toggle
+            # Mensaje JSON: texto escrito, config del toggle o confirmación
             elif msg.get("text") is not None:
                 data = json.loads(msg["text"])
                 if data.get("type") == "config":
                     speak = bool(data.get("speak", True))
                     print(f"[VOICE] speak = {speak}")
+                elif data.get("type") == "confirm_response":
+                    cid = data.get("id")
+                    approved = bool(data.get("approved"))
+                    fut = _pending_confirms.get(cid)
+                    if fut and not fut.done():
+                        fut.set_result(approved)
                 elif data.get("type") == "text":
                     content = data.get("content", "").strip()
                     if content:
-                        await handle_turn(ws, content, speak)
+                        asyncio.create_task(handle_turn(ws, content, speak, execute_tool))
     except WebSocketDisconnect:
         pass
     print("Cliente de voz desconectado")
 
 
-async def handle_turn(ws: WebSocket, user_text: str, speak: bool) -> None:
+async def handle_turn(ws: WebSocket, user_text: str, speak: bool, execute_tool) -> None:
     import time
     conversation.append("user", user_text)
-    assistant = ""
     t_start = time.perf_counter()
-    first_token = True
     try:
-        async for token in stream_reply(conversation.messages()):
-            if first_token:
-                print(f"[TIMING] Ollama 1er token: {time.perf_counter()-t_start:.2f}s")
-                first_token = False
-            assistant += token
-            await ws.send_text(json.dumps({"type": "token", "text": token}))
+        assistant = await reply_with_tools(conversation.messages(), execute_tool)
+        print(f"[TIMING] Respuesta (con tools): {time.perf_counter()-t_start:.2f}s")
 
-        if speak:
-            full = assistant.strip()
-            if len(full) > 1:
-                await _speak(ws, full)
+        await ws.send_text(json.dumps({"type": "token", "text": assistant}))
+
+        if speak and len(assistant) > 1:
+            await _speak(ws, assistant)
 
         conversation.append("assistant", assistant)
     except Exception as e:

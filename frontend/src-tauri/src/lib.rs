@@ -11,6 +11,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AudioState::default())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![greet, start_listening, stop_listening])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

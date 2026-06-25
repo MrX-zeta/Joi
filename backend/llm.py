@@ -20,10 +20,13 @@ SYSTEM_PROMPT = (
     "en tu respuesta. Por ejemplo, si la herramienta dice la fecha, dísela claramente."
     "Nunca escribas llamadas a herramientas como texto JSON en tu respuesta. "
     "Usa las herramientas through el mecanismo correcto, y responde solo con lenguaje natural."
+    "Ejecuta SOLO la acción que Luis pide en su último mensaje. "
+    "NUNCA repitas acciones de mensajes anteriores de la conversación."
+    "No menciones tareas, pendientes ni recordatorios a menos que Luis pregunte explícitamente por ellos. "
+    "Si Luis habla de otro tema, responde solo a ese tema sin recordarle sus pendientes."
 )
 
 client = AsyncClient()
-
 
 async def warmup():
     stream = await client.chat(
@@ -96,17 +99,20 @@ async def reply_with_tools(history: list[dict], execute_tool):
 
 def _try_recover_toolcall(text: str):
     """Si el modelo escribió un tool_call como JSON en el texto, lo extrae."""
-    if "open_app" not in text and "get_time" not in text and "get_date" not in text:
+    known_tools = ("open_app", "open_url", "get_time", "get_date", "add_task", "list_tasks", "complete_task")
+    if not any(t in text for t in known_tools):
         return None
     try:
-        # Busca un objeto JSON en el texto
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if not match:
             return None
-        data = _json.loads(match.group(0).replace("'", '"'))
+        raw = match.group(0)
+        # Limpia escapes y comillas problemáticas
+        raw = raw.replace('\\"', '"').replace("\\'", "'").replace("'", '"')
+        data = _json.loads(raw)
         name = data.get("name")
         args = data.get("parameters") or data.get("arguments") or {}
-        if name in ("open_app", "get_time", "get_date"):
+        if name in known_tools:
             return name, args
     except Exception:
         return None

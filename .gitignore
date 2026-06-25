@@ -22,3 +22,4 @@ tts-service/venv/
 neutts-service/venv/
 neutts-service/samples/*.wav
 neutts-service/
+backend/joi.db.respaldo

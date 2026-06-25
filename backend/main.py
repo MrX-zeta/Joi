@@ -5,7 +5,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-
+import db
 import conversation
 from llm import stream_reply, warmup
 from stt import transcribe, warmup_stt
@@ -13,9 +13,11 @@ from tts import synthesize
 
 SENTENCE_ENDS = ".!?…\n"
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    db.init_db()
+    conversation.load_from_db()
+    print("[Joi] Base de datos lista, memoria precargada.")
     print("[Joi] Precargando modelo en VRAM…")
     await warmup()
     print("[Joi] Modelo listo.")
@@ -68,7 +70,10 @@ async def ws_endpoint(ws: WebSocket):
 @app.websocket("/voice")
 async def voice_endpoint(ws: WebSocket):
     await ws.accept()
-    speak = True  # estado por conexión; el frontend lo sincroniza
+    # Enviar historial del día para poblar el sidebar
+    history = await run_in_threadpool(db.get_today)
+    await ws.send_text(json.dumps({"type": "history", "messages": history}))
+    speak = True
     try:
         while True:
             msg = await ws.receive()
@@ -77,10 +82,11 @@ async def voice_endpoint(ws: WebSocket):
 
             # Audio entrante -> STT
             if msg.get("bytes") is not None:
+                import time
+                t0 = time.perf_counter()
                 audio = np.frombuffer(msg["bytes"], dtype=np.float32)
-                print(f"[VOICE] audio: {audio.size} muestras")
                 text = await run_in_threadpool(transcribe, audio)
-                print(f"[VOICE] STT: {text!r}")
+                print(f"[TIMING] STT: {time.perf_counter()-t0:.2f}s → {text!r}")
                 if not text:
                     await ws.send_text(json.dumps({"type": "end"}))
                     continue
@@ -103,23 +109,24 @@ async def voice_endpoint(ws: WebSocket):
 
 
 async def handle_turn(ws: WebSocket, user_text: str, speak: bool) -> None:
+    import time
     conversation.append("user", user_text)
     assistant = ""
-    buffer = ""
+    t_start = time.perf_counter()
+    first_token = True
     try:
         async for token in stream_reply(conversation.messages()):
+            if first_token:
+                print(f"[TIMING] Ollama 1er token: {time.perf_counter()-t_start:.2f}s")
+                first_token = False
             assistant += token
-            buffer += token
             await ws.send_text(json.dumps({"type": "token", "text": token}))
-            if speak and any(p in token for p in SENTENCE_ENDS):
-                sentence = buffer.strip()
-                buffer = ""
-                if len(sentence) > 1:
-                    await _speak(ws, sentence)
+
         if speak:
-            tail = buffer.strip()
-            if len(tail) > 1:
-                await _speak(ws, tail)
+            full = assistant.strip()
+            if len(full) > 1:
+                await _speak(ws, full)
+
         conversation.append("assistant", assistant)
     except Exception as e:
         print(f"[VOICE] ERROR: {e!r}")
@@ -128,7 +135,8 @@ async def handle_turn(ws: WebSocket, user_text: str, speak: bool) -> None:
 
 
 async def _speak(ws: WebSocket, sentence: str) -> None:
-    """Sintetiza una frase y la envía como un frame binario (mp3)."""
     audio_bytes = b"".join([chunk async for chunk in synthesize(sentence)])
     if audio_bytes:
+        await ws.send_text(json.dumps({"type": "audio_start"}))
         await ws.send_bytes(audio_bytes)
+        await ws.send_text(json.dumps({"type": "audio_end"}))

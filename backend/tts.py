@@ -1,11 +1,10 @@
-import edge_tts
+import httpx
 
-VOICE = "es-MX-DaliaNeural"
+TTS_SERVICE_URL = "http://localhost:8001/speak"
 
 
 async def synthesize(text: str):
-    """Genera audio MP3 en streaming (chunks de bytes)."""
-    communicate = edge_tts.Communicate(text, VOICE)
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            yield chunk["data"]
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(TTS_SERVICE_URL, json={"text": text})
+        resp.raise_for_status()
+        yield resp.content

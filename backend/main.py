@@ -52,6 +52,8 @@ def health():
 def _confirm_label(name: str, args: dict) -> str:
     if name == "open_app":
         return f"¿Abrir {args.get('name', 'la aplicación')}?"
+    if name == "open_url":
+        return f"¿Abrir {args.get('site', 'el sitio')} en el navegador?"
     return f"¿Confirmas la acción {name}?"
 
 

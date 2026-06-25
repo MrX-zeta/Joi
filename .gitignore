@@ -13,3 +13,12 @@ frontend/src-tauri/target/
 # Pruebas y audio (descartables)
 *.mp3
 backend/test_voice.py
+*.onnx
+backend/joi.db
+backend/joi.db.bak
+neutts-service/venv/
+neutts-service/samples/*.wav
+tts-service/venv/
+neutts-service/venv/
+neutts-service/samples/*.wav
+neutts-service/

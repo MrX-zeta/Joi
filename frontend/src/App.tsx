@@ -47,6 +47,14 @@ export default function App() {
   });
 
   const { status: voiceStatus, sendAudio, sendText, sendConfig } = useVoiceChannel({
+    onHistory: (hist) => {
+      setMessages(
+        hist.map((m) => ({
+          role: m.role === "assistant" ? "joi" : "user",
+          content: m.content,
+        })) as Message[]
+      );
+    },
     onTranscript: (t) => commitUser(t),
     onToken: (t) => appendToken(t),
     onEnd: () => commitAssistant(),
@@ -147,7 +155,7 @@ export default function App() {
         <SidebarIcon />
       </button>
 
-      {/* Historial: overlay flotante (aparece encima, sin mover nada) */}
+      {/* Historial: overlay flotante */}
       <Sidebar
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

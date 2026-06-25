@@ -7,6 +7,7 @@ type VoiceHandlers = {
   onToken?: (text: string) => void;
   onEnd?: () => void;
   onSpeakingChange?: (speaking: boolean) => void;
+  onHistory?: (messages: { role: string; content: string }[]) => void;
 };
 
 export function useVoiceChannel(
@@ -24,7 +25,10 @@ export function useVoiceChannel(
   const playNext = () => {
     if (playing.current) return;
     const next = queue.current.shift();
-    if (!next) return;
+    if (!next) {
+      h.current.onSpeakingChange?.(false);
+      return;
+    }
     playing.current = true;
     h.current.onSpeakingChange?.(true);
     const audio = new Audio(next);
@@ -58,12 +62,15 @@ export function useVoiceChannel(
       ws.onmessage = (e) => {
         if (typeof e.data === "string") {
           const msg = JSON.parse(e.data);
-          if (msg.type === "transcript") h.current.onTranscript?.(msg.text);
+          if (msg.type === "history") h.current.onHistory?.(msg.messages);
+          else if (msg.type === "transcript") h.current.onTranscript?.(msg.text);
           else if (msg.type === "token") h.current.onToken?.(msg.text);
           else if (msg.type === "end") h.current.onEnd?.();
+          // audio_start / audio_end se ignoran: el control de "hablando"
+          // lo maneja la cola de reproducción (playNext)
         } else {
           const blobUrl = URL.createObjectURL(
-            new Blob([e.data], { type: "audio/mpeg" })
+            new Blob([e.data], { type: "audio/wav" })
           );
           queue.current.push(blobUrl);
           playNext();

@@ -12,13 +12,19 @@ export function useJoiVoice(handlers: Handlers) {
   const ref = useRef(handlers);
   ref.current = handlers;
 
+  const lastUtterance = useRef(0);
+
   useEffect(() => {
     const unlisteners = [
       listen("joi://listening", () => ref.current.onListening?.()),
       listen("joi://speech-end", () => ref.current.onSpeechEnd?.()),
-      listen<number[]>("joi://utterance", (e) =>
-        ref.current.onUtterance?.(Float32Array.from(e.payload))
-      ),
+      listen<number[]>("joi://utterance", (e) => {
+        // Anti-duplicado: ignora utterances que llegan pegadas (StrictMode / VAD doble)
+        const now = Date.now();
+        if (now - lastUtterance.current < 600) return;
+        lastUtterance.current = now;
+        ref.current.onUtterance?.(Float32Array.from(e.payload));
+      }),
     ];
     return () => {
       unlisteners.forEach((p) => p.then((fn) => fn()));

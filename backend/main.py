@@ -7,6 +7,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from notifier import reminder_loop
 import db
 import conversation
 import tools
@@ -18,6 +19,24 @@ SENTENCE_ENDS = ".!?…\n"
 
 # Confirmaciones pendientes: id -> asyncio.Future que se resuelve con True/False
 _pending_confirms: dict[str, asyncio.Future] = {}
+
+# Clientes WebSocket de voz conectados (para empujar recordatorios)
+_voice_clients: set[WebSocket] = set()
+
+
+async def _push_reminder(reminder_id: int, text: str):
+    """Empuja un recordatorio vencido: notificación al frontend + voz de Joi."""
+    frase = f"Luis, te recuerdo: {text}."
+    for ws in list(_voice_clients):
+        try:
+            await ws.send_text(json.dumps({
+                "type": "reminder_due",
+                "text": text,
+                "spoken": frase,
+            }))
+            await _speak(ws, frase)
+        except Exception:
+            _voice_clients.discard(ws)
 
 
 @asynccontextmanager
@@ -31,7 +50,10 @@ async def lifespan(app: FastAPI):
     print("[Joi] Precargando Whisper…")
     await run_in_threadpool(warmup_stt)
     print("[Joi] Whisper listo.")
+    task = asyncio.create_task(reminder_loop(_push_reminder))
+    print("[Joi] Notificador de recordatorios activo.")
     yield
+    task.cancel()
 
 
 app = FastAPI(title="Joi Brain", lifespan=lifespan)
@@ -85,6 +107,7 @@ async def ws_endpoint(ws: WebSocket):
 @app.websocket("/voice")
 async def voice_endpoint(ws: WebSocket):
     await ws.accept()
+    _voice_clients.add(ws)
     # Enviar historial del día para poblar el sidebar
     history = await run_in_threadpool(db.get_today)
     await ws.send_text(json.dumps({"type": "history", "messages": history}))
@@ -150,6 +173,8 @@ async def voice_endpoint(ws: WebSocket):
                         asyncio.create_task(handle_turn(ws, content, speak, execute_tool))
     except WebSocketDisconnect:
         pass
+    finally:
+        _voice_clients.discard(ws)
     print("Cliente de voz desconectado")
 
 

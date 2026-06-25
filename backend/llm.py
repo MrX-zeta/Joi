@@ -24,6 +24,9 @@ SYSTEM_PROMPT = (
     "NUNCA repitas acciones de mensajes anteriores de la conversación."
     "No menciones tareas, pendientes ni recordatorios a menos que Luis pregunte explícitamente por ellos. "
     "Si Luis habla de otro tema, responde solo a ese tema sin recordarle sus pendientes."
+    "IMPORTANTE: cuando una herramienta te dé un resultado, comunica ese resultado a Luis "
+    "usando exactamente las mismas palabras que devolvió la herramienta, sin reformular ni inventar palabras. "
+    "Por ejemplo, si la herramienta dice 'Listo, te recordaré tomar agua a las 16:15', repite eso tal cual."
 )
 
 client = AsyncClient()
@@ -99,7 +102,8 @@ async def reply_with_tools(history: list[dict], execute_tool):
 
 def _try_recover_toolcall(text: str):
     """Si el modelo escribió un tool_call como JSON en el texto, lo extrae."""
-    known_tools = ("open_app", "open_url", "get_time", "get_date", "add_task", "list_tasks", "complete_task")
+    known_tools = ("open_app", "open_url", "get_time", "get_date", "add_task",
+                   "list_tasks", "complete_task", "add_reminder", "list_reminders")
     if not any(t in text for t in known_tools):
         return None
     try:
@@ -107,8 +111,12 @@ def _try_recover_toolcall(text: str):
         if not match:
             return None
         raw = match.group(0)
-        # Limpia escapes y comillas problemáticas
-        raw = raw.replace('\\"', '"').replace("\\'", "'").replace("'", '"')
+        # Reparaciones de JSON malformado del 3B
+        raw = raw.replace('\\"', '"').replace("\\'", "'")
+        raw = re.sub(r'(\w+)=', r'"\1":', raw)   # parameters= → "parameters":
+        raw = raw.replace("'", '"')
+        # Colapsa comillas dobles repetidas
+        raw = re.sub(r'""+', '"', raw)
         data = _json.loads(raw)
         name = data.get("name")
         args = data.get("parameters") or data.get("arguments") or {}

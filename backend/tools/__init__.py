@@ -1,4 +1,4 @@
-from . import system, tasks
+from . import system, tasks, reminders
 
 # Registro central de herramientas.
 # Cada entrada: el esquema (para el LLM) + la función real + flag de confirmación.
@@ -114,6 +114,37 @@ TOOLS = {
                     },
                     "required": ["title"],
                 },
+            },
+        },
+    },
+    "add_reminder": {
+        "fn": reminders.add_reminder,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "add_reminder",
+                "description": "Crea un recordatorio con hora. Úsala cuando Luis pida que le recuerdes algo a una hora o tiempo específico (ej. 'recuérdame llamar a las 5', 'avísame en 20 minutos').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "Qué recordar, ej. 'llamar a mamá'."},
+                        "when": {"type": "string", "description": "Cuándo, en lenguaje natural, ej. 'a las 5', 'en 10 minutos', 'mañana a las 3'."},
+                    },
+                    "required": ["text", "when"],
+                },
+            },
+        },
+    },
+    "list_reminders": {
+        "fn": reminders.list_reminders,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "list_reminders",
+                "description": "Lista los recordatorios pendientes de Luis. Úsala cuando pregunte qué recordatorios o avisos tiene.",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
     },

@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useJoiSocket } from "./lib/useJoiSocket";
 import { useJoiVoice, startListening, stopListening } from "./lib/useJoiVoice";
 import { useVoiceChannel } from "./lib/useVoiceChannel";
+import {
+  sendNotification,
+  isPermissionGranted,
+  requestPermission,
+} from "@tauri-apps/plugin-notification";
 import Aurora, { type AuroraState } from "./components/Aurora";
 import Sidebar, { type Message } from "./components/Sidebar";
 import Dock from "./components/Dock";
@@ -43,6 +48,22 @@ export default function App() {
   };
   const commitUser = (t: string) => setMessages((m) => [...m, { role: "user", content: t }]);
 
+  // Dispara una notificación nativa de Windows (pide permiso si hace falta)
+  const notifyReminder = async (text: string) => {
+    try {
+      let granted = await isPermissionGranted();
+      if (!granted) {
+        const perm = await requestPermission();
+        granted = perm === "granted";
+      }
+      if (granted) {
+        sendNotification({ title: "Joi — Recordatorio", body: text });
+      }
+    } catch (e) {
+      console.error("No se pudo notificar:", e);
+    }
+  };
+
   const { status, send } = useJoiSocket((token) => {
     if (token === "[[END]]") return commitAssistant();
     appendToken(token);
@@ -65,6 +86,10 @@ export default function App() {
       setSpeaking(s);
     },
     onConfirmRequest: (req) => setConfirmReq({ id: req.id, label: req.label }),
+    onReminderDue: (text) => {
+      notifyReminder(text);
+      setMessages((m) => [...m, { role: "joi", content: `🔔 Recordatorio: ${text}` }]);
+    },
   });
 
   useEffect(() => {

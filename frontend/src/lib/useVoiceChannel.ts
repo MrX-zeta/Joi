@@ -16,6 +16,7 @@ type VoiceHandlers = {
   onSpeakingChange?: (speaking: boolean) => void;
   onHistory?: (messages: { role: string; content: string }[]) => void;
   onConfirmRequest?: (req: ConfirmRequest) => void;
+  onReminderDue?: (text: string) => void;
 };
 
 export function useVoiceChannel(
@@ -80,6 +81,7 @@ export function useVoiceChannel(
               args: msg.args,
               label: msg.label,
             });
+          else if (msg.type === "reminder_due") h.current.onReminderDue?.(msg.text);
           else if (msg.type === "end") h.current.onEnd?.();
           // audio_start / audio_end se ignoran: el control de "hablando"
           // lo maneja la cola de reproducción (playNext)

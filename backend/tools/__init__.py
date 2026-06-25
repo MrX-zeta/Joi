@@ -1,4 +1,4 @@
-from . import system
+from . import system, tasks
 
 # Registro central de herramientas.
 # Cada entrada: el esquema (para el LLM) + la función real + flag de confirmación.
@@ -65,6 +65,54 @@ TOOLS = {
                         },
                     },
                     "required": ["site"],
+                },
+            },
+        },
+    },
+    "add_task": {
+        "fn": tasks.add_task,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "add_task",
+                "description": "Guarda UNA tarea NUEVA. Úsala SOLO cuando Luis pide anotar algo por primera vez. NUNCA la uses si Luis dice que YA terminó o completó algo.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "La tarea a guardar, por ejemplo 'entregar el proyecto de física'."},
+                    },
+                    "required": ["title"],
+                },
+            },
+        },
+    },
+    "list_tasks": {
+        "fn": tasks.list_tasks,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "list_tasks",
+                "description": "Lista las tareas pendientes de Luis. Úsala cuando pregunte qué tiene pendiente, qué tareas tiene o qué debe hacer.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+    },
+    "complete_task": {
+        "fn": tasks.complete_task,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "complete_task",
+                "description": "Marca una tarea existente como COMPLETADA. Úsala SIEMPRE que Luis diga 'ya terminé', 'ya hice', 'completé' o 'listo' sobre una tarea. NUNCA uses add_task en ese caso.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Texto de la tarea que completó."},
+                    },
+                    "required": ["title"],
                 },
             },
         },

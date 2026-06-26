@@ -160,6 +160,26 @@ TOOLS = {
             },
         },
     },
+    "create_calendar_event": {
+        "fn": gcalendar.create_calendar_event,
+        "requires_confirmation": True,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "create_calendar_event",
+                "description": "Crea un evento nuevo en el calendario de Google de Luis. Úsala cuando pida agendar, programar o crear una reunión, cita o evento con fecha y hora.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Título del evento, ej. 'Reunión con Carlos'."},
+                        "when": {"type": "string", "description": "Cuándo, ej. 'mañana a las 3', 'el viernes a las 10'."},
+                        "duration_min": {"type": "integer", "description": "Duración en minutos (por defecto 60)."},
+                    },
+                    "required": ["title", "when"],
+                },
+            },
+        },
+    },
 }
 
 

@@ -76,6 +76,8 @@ def _confirm_label(name: str, args: dict) -> str:
         return f"¿Abrir {args.get('name', 'la aplicación')}?"
     if name == "open_url":
         return f"¿Abrir {args.get('site', 'el sitio')} en el navegador?"
+    if name == "create_calendar_event":
+        return f"¿Crear el evento «{args.get('title', '')}»?"
     return f"¿Confirmas la acción {name}?"
 
 

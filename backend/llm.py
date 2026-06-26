@@ -13,7 +13,7 @@ SYSTEM_PROMPT = (
     "BREVEDAD: responde en 1 o 2 frases cortas, naturales para hablar. Sin listas ni preámbulos. "
     "Solo te extiendes si Luis lo pide explícitamente. Hablas español natural. "
     "\n\n"
-    "HERRAMIENTAS: úsalas para datos reales (hora, fecha, tareas, recordatorios, calendario). "
+    "HERRAMIENTAS: úsalas para datos reales (hora, fecha, tareas, recordatorios, calendario, correo). "
     "Nunca escribas llamadas a herramientas como JSON en tu respuesta; el sistema las ejecuta. "
     "Ejecuta solo lo que Luis pide en su último mensaje; no repitas acciones anteriores. "
     "\n\n"
@@ -22,10 +22,12 @@ SYSTEM_PROMPT = (
     "o un 'No entendí', comunícale ese error a Luis tal cual y NO digas que se completó. "
     "Nunca inventes eventos, reuniones, tareas, horas ni fechas. Si no tienes el dato, dilo. "
     "\n\n"
-    "EJECUTA SIEMPRE LA HERRAMIENTA: cada vez que Luis pida abrir una app o un sitio, agendar, "
-    "recordar o consultar algo, DEBES llamar a la herramienta correspondiente EN ESTE TURNO, "
-    "aunque ya hayas hecho una acción parecida antes en la conversación. "
-    "NUNCA digas que abriste, creaste o hiciste algo sin haber llamado la herramienta en este turno. "
+    "EJECUTA SIEMPRE LA HERRAMIENTA: cada vez que Luis pida abrir una app o sitio, agendar, "
+    "recordar, revisar su correo o buscar correos de alguien, DEBES llamar a la herramienta "
+    "correspondiente EN ESTE TURNO, aunque ya hayas hecho algo parecido antes. "
+    "Cada petición es independiente: si Luis pregunta por correos de 'Railway', busca 'Railway', "
+    "no reutilices ni mezcles una búsqueda anterior como 'JetBrains'. "
+    "NUNCA digas que abriste, creaste, leíste o buscaste algo sin haber llamado la herramienta en este turno. "
     "\n\n"
     "FORMATO DE RESPUESTA: comunica el resultado de la herramienta usando SUS MISMAS PALABRAS, sin "
     "reformular ni resumir. Si la herramienta lista varios eventos, menciónalos TODOS con su título y hora "
@@ -137,7 +139,8 @@ def _try_recover_toolcall(text: str):
     """Si el modelo escribió un tool_call como JSON en el texto, lo extrae."""
     known_tools = ("open_app", "open_url", "get_time", "get_date", "add_task",
                    "list_tasks", "complete_task", "add_reminder", "list_reminders",
-                   "list_calendar_events", "create_calendar_event", "get_datetime")
+                   "list_calendar_events", "create_calendar_event", "get_datetime",
+                   "revisar_correo")
     if not any(t in text for t in known_tools):
         return None
 
@@ -162,13 +165,13 @@ def _try_recover_toolcall(text: str):
         name = name_match.group(1)
         if name in known_tools:
             args = {}
-            for key in ("title", "site", "name", "text", "when"):
+            for key in ("title", "site", "name", "text", "when", "query"):
                 m = re.search(rf'"?{key}"?\s*[:=]\s*"([^"]+)"', text)
                 if m:
                     args[key] = m.group(1)
             return name, args
     sin_args = ("list_tasks", "list_reminders", "list_calendar_events",
-                "get_time", "get_date", "get_datetime")
+                "get_time", "get_date", "get_datetime", "revisar_correo")
     for tool_name in sin_args:
         if tool_name in text:
             return tool_name, {}

@@ -1,4 +1,4 @@
-from . import system, tasks, reminders, gcalendar
+from . import system, tasks, reminders, gcalendar, gmail
 
 # Registro central de herramientas.
 # Cada entrada: el esquema (para el LLM) + la función real + flag de confirmación.
@@ -193,6 +193,23 @@ TOOLS = {
             },
         },
     },
+    "revisar_correo": {
+        "fn": gmail.revisar_correo,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "revisar_correo",
+                "description": "Revisa el Gmail de Luis. Sin parámetros lee sus correos sin leer recientes. Con 'query' busca correos de un remitente (persona o empresa), asunto o palabra clave. Úsala SIEMPRE que Luis pregunte por su correo, si tiene correos nuevos, o si tiene correos de alguien o sobre algún tema. NUNCA inventes correos.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Opcional. A quién o qué buscar (ej. 'Horacio Cisneros', 'JetBrains', 'factura'). Déjalo vacío para leer los no leídos."},
+                    },
+                },
+            },
+        },
+    },
 }
 
 # Tools cuyo resultado ya está listo para el usuario: se devuelve tal cual,
@@ -205,6 +222,7 @@ DIRECT_REPLY_TOOLS = {
     "get_date",
     "add_reminder",
     "list_reminders",
+    "revisar_correo",
 }
 
 def is_direct_reply(name: str) -> bool:

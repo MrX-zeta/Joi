@@ -4,11 +4,17 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+# === CUENTA ACTIVA: cambia esta línea para alternar de cuenta ===
+CUENTA_ACTIVA = "universidad"   # opciones: "universidad", "personal"
+
 BASE = Path(__file__).parent
 CREDENTIALS_FILE = BASE / "credentials.json"
-TOKEN_FILE = BASE / "token.json"
+TOKEN_FILE = BASE / f"token_{CUENTA_ACTIVA}.json"
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
 
 
 def get_credentials() -> Credentials:

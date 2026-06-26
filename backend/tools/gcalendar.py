@@ -90,6 +90,6 @@ def create_calendar_event(title: str = "", day: str = "", start_time: str = "",
         dia_sem = DIAS_SEM[inicio.weekday()]
         ini_str = f"el {dia_sem} {inicio.day} de {MESES[inicio.month-1]} a las {_hora_12h(inicio)}"
         fin_str = _hora_12h(fin)
-        return f"Listo, creé el evento «{title}» {ini_str}, hasta las {fin_str}."
+        return f"Listo, creé el evento {title} {ini_str}, hasta las {fin_str}."
     except Exception as e:
         return f"No pude crear el evento: {e}"

@@ -1,4 +1,4 @@
-from . import system, tasks, reminders
+from . import system, tasks, reminders, gcalendar
 
 # Registro central de herramientas.
 # Cada entrada: el esquema (para el LLM) + la función real + flag de confirmación.
@@ -144,6 +144,18 @@ TOOLS = {
             "function": {
                 "name": "list_reminders",
                 "description": "Lista los recordatorios pendientes de Luis. Úsala cuando pregunte qué recordatorios o avisos tiene.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+    },
+    "list_calendar_events": {
+        "fn": gcalendar.list_calendar_events,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "list_calendar_events",
+                "description": "Consulta el calendario de Google de Luis: sus eventos, agenda, citas, reuniones o lo que tiene programado. Úsala SIEMPRE que pregunte por su agenda, su calendario, qué tiene esta semana, o qué tiene programado. NUNCA digas que no tienes acceso al calendario: SÍ tienes esta herramienta.",
                 "parameters": {"type": "object", "properties": {}},
             },
         },

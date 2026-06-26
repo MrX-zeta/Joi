@@ -27,6 +27,12 @@ SYSTEM_PROMPT = (
     "IMPORTANTE: cuando una herramienta te dé un resultado, comunica ese resultado a Luis "
     "usando exactamente las mismas palabras que devolvió la herramienta, sin reformular ni inventar palabras. "
     "Por ejemplo, si la herramienta dice 'Listo, te recordaré tomar agua a las 16:15', repite eso tal cual."
+    "Háblale SIEMPRE a Luis directamente, en segunda persona ('tú', 'tienes', 'tu reunión'), "
+    "nunca en tercera persona. Di 'Tienes una reunión' en vez de 'Luis tiene una reunión'."
+    "REGLA CRÍTICA: NUNCA inventes información. No inventes eventos, reuniones, tareas, horas ni fechas. "
+    "Si no tienes el dato de una herramienta, di que no tienes esa información. "
+    "Solo menciona eventos o tareas que una herramienta te haya devuelto explícitamente en esta conversación. "
+    "Si la herramienta de calendario no devolvió eventos, di que no hay eventos, nunca inventes uno."
 )
 
 client = AsyncClient()
@@ -103,25 +109,44 @@ async def reply_with_tools(history: list[dict], execute_tool):
 def _try_recover_toolcall(text: str):
     """Si el modelo escribió un tool_call como JSON en el texto, lo extrae."""
     known_tools = ("open_app", "open_url", "get_time", "get_date", "add_task",
-                   "list_tasks", "complete_task", "add_reminder", "list_reminders")
+                   "list_tasks", "complete_task", "add_reminder", "list_reminders",
+                   "list_calendar_events")
     if not any(t in text for t in known_tools):
         return None
+
+    # Intento 1: parsear como JSON (reparando errores comunes)
     try:
         match = re.search(r'\{.*\}', text, re.DOTALL)
-        if not match:
-            return None
-        raw = match.group(0)
-        # Reparaciones de JSON malformado del 3B
-        raw = raw.replace('\\"', '"').replace("\\'", "'")
-        raw = re.sub(r'(\w+)=', r'"\1":', raw)   # parameters= → "parameters":
-        raw = raw.replace("'", '"')
-        # Colapsa comillas dobles repetidas
-        raw = re.sub(r'""+', '"', raw)
-        data = _json.loads(raw)
-        name = data.get("name")
-        args = data.get("parameters") or data.get("arguments") or {}
-        if name in known_tools:
-            return name, args
+        if match:
+            raw = match.group(0)
+            raw = raw.replace('\\"', '"').replace("\\'", "'")
+            raw = re.sub(r'(\w+)=', r'"\1":', raw)
+            raw = raw.replace("'", '"')
+            raw = re.sub(r'""+', '"', raw)
+            data = _json.loads(raw)
+            name = data.get("name")
+            args = data.get("parameters") or data.get("arguments") or {}
+            if name in known_tools:
+                return name, args
     except Exception:
-        return None
+        pass
+
+    # Intento 2 (fallback): si el JSON está muy roto, extrae el nombre con regex.
+    # Para tools sin argumentos (list_*, get_*) esto basta.
+    name_match = re.search(r'"?name"?\s*[:=]\s*"?(\w+)"?', text)
+    if name_match:
+        name = name_match.group(1)
+        if name in known_tools:
+            # Intenta extraer args simples tipo "title": "valor"
+            args = {}
+            for key in ("title", "site", "name", "text", "when"):
+                m = re.search(rf'"?{key}"?\s*[:=]\s*"([^"]+)"', text)
+                if m:
+                    args[key] = m.group(1)
+            return name, args
+    sin_args = ("list_tasks", "list_reminders", "list_calendar_events",
+                "get_time", "get_date")
+    for tool_name in sin_args:
+        if tool_name in text:
+            return tool_name, {}
     return None

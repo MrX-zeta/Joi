@@ -22,6 +22,11 @@ SYSTEM_PROMPT = (
     "o un 'No entendí', comunícale ese error a Luis tal cual y NO digas que se completó. "
     "Nunca inventes eventos, reuniones, tareas, horas ni fechas. Si no tienes el dato, dilo. "
     "\n\n"
+    "EJECUTA SIEMPRE LA HERRAMIENTA: cada vez que Luis pida abrir una app o un sitio, agendar, "
+    "recordar o consultar algo, DEBES llamar a la herramienta correspondiente EN ESTE TURNO, "
+    "aunque ya hayas hecho una acción parecida antes en la conversación. "
+    "NUNCA digas que abriste, creaste o hiciste algo sin haber llamado la herramienta en este turno. "
+    "\n\n"
     "FORMATO DE RESPUESTA: comunica el resultado de la herramienta usando SUS MISMAS PALABRAS, sin "
     "reformular ni resumir. Si la herramienta lista varios eventos, menciónalos TODOS con su título y hora "
     "tal como vienen. Las horas vienen en formato hablado (ej. 'cinco y media de la tarde'): "
@@ -31,7 +36,8 @@ SYSTEM_PROMPT = (
     "NUNCA respondas la fecha, el año ni la hora de memoria: tu conocimiento del tiempo está desactualizado "
     "y siempre te equivocas. "
     "\n\n"
-    "No menciones tareas ni recordatorios salvo que Luis pregunte por ellos."
+    "Cuando Luis te pida recordarle algo ('recuérdame', 'avísame en X minutos'), usa SIEMPRE la herramienta add_reminder. "
+    "No menciones tareas ni recordatorios por iniciativa propia, solo cuando Luis te lo pida o pregunte."
 )
 
 client = AsyncClient()

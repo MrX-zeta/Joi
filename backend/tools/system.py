@@ -63,7 +63,8 @@ ALLOWED_APPS = {
     "brave": {"cmds": [r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe", "start brave"], "proc": "brave.exe", "window": "Brave"},
     "navegador": {"cmds": [r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe", "start brave"], "proc": "brave.exe", "window": "Brave"},
     "calculadora": {"cmds": ["calc"], "proc": "CalculatorApp.exe", "window": "Calculadora"},
-    "bloc de notas": {"cmds": ["notepad"], "proc": "notepad.exe", "window": "Bloc de notas"},
+    "bloc de notas": {"cmds": ["notepad"], "proc": "notepad.exe", "window": "Notepad"},
+    "notepad": {"cmds": ["notepad"], "proc": "notepad.exe", "window": "Notepad"},
     "explorador": {"cmds": ["explorer"], "proc": "explorer.exe", "window": ""},
     "vscode": {"cmds": ["code"], "proc": "Code.exe", "window": "Visual Studio Code"},
     "visual studio code": {"cmds": ["code"], "proc": "Code.exe", "window": "Visual Studio Code"},
@@ -139,7 +140,13 @@ def _focus_window(title_hint: str) -> bool:
         try:
             import win32gui
             import win32con
+            import win32com.client
             hwnd = w._hWnd
+
+            # Truco: envía ALT para desbloquear SetForegroundWindow en Windows
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shell.SendKeys('%')
+
             if win32gui.IsIconic(hwnd):
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)

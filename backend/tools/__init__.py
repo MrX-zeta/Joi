@@ -207,7 +207,6 @@ DIRECT_REPLY_TOOLS = {
     "list_reminders",
 }
 
-
 def is_direct_reply(name: str) -> bool:
     return name in DIRECT_REPLY_TOOLS
 

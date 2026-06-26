@@ -11,6 +11,7 @@ RELATIVAS = ["minuto", "hora", "segundo"]
 
 def add_reminder(text: str = "", when: str = "", **kwargs) -> str:
     """Crea un recordatorio. 'when' es una expresión de tiempo en español."""
+    from .system import _hora_12h
     text = text.strip()
     when = when.strip()
 
@@ -63,17 +64,35 @@ def add_reminder(text: str = "", when: str = "", **kwargs) -> str:
         return "Eso es demasiado lejano. Dime una fecha dentro del próximo año."
 
     db.add_reminder(text, remind_at)
-    cuando = remind_at.strftime("%H:%M del %d/%m")
-    return f"Listo, te recordaré «{text}» a las {cuando}."
+
+    # Formato hablado: sin fecha si es hoy, con fecha si es otro día
+    hora_str = _hora_12h(remind_at)
+    if remind_at.date() == now.date():
+        cuando = f"a las {hora_str}"
+    else:
+        MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                 "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        cuando = f"el {remind_at.day} de {MESES[remind_at.month-1]} a las {hora_str}"
+    return f"Listo, te recordaré {text} {cuando}."
 
 
 def list_reminders(**kwargs) -> str:
     """Lista los recordatorios pendientes."""
+    from .system import _hora_12h
     rems = db.list_reminders(include_notified=False)
     if not rems:
         return "No tienes recordatorios pendientes."
+
+    now = datetime.now()
+    MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     lineas = []
     for r in rems:
-        hora = datetime.fromisoformat(r["remind_at"]).strftime("%H:%M")
-        lineas.append(f"{r['text']} a las {hora}")
+        dt = datetime.fromisoformat(r["remind_at"])
+        hora_str = _hora_12h(dt)
+        if dt.date() == now.date():
+            cuando = f"a las {hora_str}"
+        else:
+            cuando = f"el {dt.day} de {MESES[dt.month-1]} a las {hora_str}"
+        lineas.append(f"{r['text']} {cuando}")
     return "Tus recordatorios: " + "; ".join(lineas) + "."

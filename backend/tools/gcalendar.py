@@ -1,17 +1,21 @@
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
-
+from .system import _hora_12h
 from gauth import get_credentials
+
+DIAS_SEM = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+         "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 
 
 def list_calendar_events(**kwargs) -> str:
-    """Lee los próximos eventos del calendario de Luis (hoy y mañana)."""
+    """Lee los próximos eventos del calendario de Luis (próximos 7 días)."""
     try:
         creds = get_credentials()
         service = build("calendar", "v3", credentials=creds)
 
         now = datetime.utcnow()
-        fin = now + timedelta(days=2)
+        fin = now + timedelta(days=7)
 
         result = service.events().list(
             calendarId="primary",
@@ -32,63 +36,41 @@ def list_calendar_events(**kwargs) -> str:
             titulo = ev.get("summary", "(sin título)")
             try:
                 dt = datetime.fromisoformat(inicio.replace("Z", "+00:00"))
-                cuando = dt.strftime("%d/%m a las %H:%M")
+                dia_sem = DIAS_SEM[dt.weekday()]
+                cuando = f"el {dia_sem} {dt.day} de {MESES[dt.month-1]} a las {_hora_12h(dt)}"
             except Exception:
                 cuando = inicio
-            lineas.append(f"{titulo} el {cuando}")
+            lineas.append(f"{titulo} {cuando}")
         return "Tus próximos eventos: " + "; ".join(lineas) + "."
     except Exception as e:
         return f"No pude leer el calendario: {e}"
 
-def create_calendar_event(title: str = "", when: str = "", duration_min: int = 60, **kwargs) -> str:
-    """Crea un evento en el calendario de Luis."""
+
+def create_calendar_event(title: str = "", day: str = "", start_time: str = "",
+                          end_time: str = "", duration_min: int = 60, **kwargs) -> str:
+    """Crea un evento. Recibe día y horas por separado (no texto libre)."""
     import dateparser
-    import re
     title = title.strip()
-    if not title or not when:
-        return "Necesito el título del evento y cuándo."
+    if not title or not day or not start_time:
+        return "ERROR: faltan datos. Dile a Luis: 'Necesito el título, el día y la hora.'"
 
-    w = when.lower().strip()
-    base = datetime.now()
-    settings = {"PREFER_DATES_FROM": "future", "RELATIVE_BASE": base}
+    settings = {"PREFER_DATES_FROM": "future", "RELATIVE_BASE": datetime.now()}
 
-    # Separa inicio y fin si hay un rango ("hasta", "-", "de X a Y", o segundo "a las")
-    fin_texto = None
-    if " hasta " in w:
-        ini_texto, fin_texto = w.split(" hasta ", 1)
-    elif re.search(r'\bde\s+[\d:]+\s*(?:am|pm)?\s+a\s+[\d:]+', w):
-        # patrón "de 11:30 a 14:00" / "de 11:30am a 2pm"
-        m = re.search(
-            r'(.*?)\bde\s+([\d:]+\s*(?:am|pm)?)\s+a\s+([\d:]+\s*(?:am|pm)?)',
-            w,
-        )
-        if m:
-            prefijo = m.group(1).strip()      # "domingo"
-            hora_ini = m.group(2).strip()     # "11:30"
-            hora_fin = m.group(3).strip()     # "14:00"
-            ini_texto = f"{prefijo} {hora_ini}".strip()
-            fin_texto = hora_fin
-        else:
-            ini_texto = w
-    elif "-" in w:
-        ini_texto, fin_texto = w.split("-", 1)
-    else:
-        partes = w.split(" a las ")
-        if len(partes) > 2:
-            ini_texto = " a las ".join(partes[:2])
-            fin_texto = partes[2]
-        else:
-            ini_texto = w
+    # Limpia prefijos que confunden a dateparser ("este domingo" → "domingo")
+    day_limpio = (day.lower()
+                  .replace("este ", "").replace("esta ", "")
+                  .replace("el ", "").replace("la ", "")
+                  .replace("próximo ", "").replace("próxima ", "")
+                  .strip())
 
-    inicio = dateparser.parse(ini_texto, languages=["es"], settings=settings)
+    inicio = dateparser.parse(f"{day_limpio} {start_time}", languages=["es"], settings=settings)
     if not inicio:
-        return "ERROR: no se creó el evento. Dile a Luis exactamente: 'No entendí la hora, ¿me la repites?'"
+        return "ERROR: no se creó el evento. Dile a Luis: 'No entendí la fecha, ¿me la repites?'"
 
-    # Calcula el fin: desde la hora de fin si se dio, si no por duración
+    # Hora de fin: si se dio, úsala; si no, duración default
     fin = None
-    if fin_texto:
-        fin_settings = {"PREFER_DATES_FROM": "future", "RELATIVE_BASE": inicio}
-        fin_parsed = dateparser.parse(fin_texto, languages=["es"], settings=fin_settings)
+    if end_time.strip():
+        fin_parsed = dateparser.parse(f"{day_limpio} {end_time}", languages=["es"], settings=settings)
         if fin_parsed:
             fin = inicio.replace(hour=fin_parsed.hour, minute=fin_parsed.minute)
             if fin <= inicio:
@@ -105,8 +87,9 @@ def create_calendar_event(title: str = "", when: str = "", duration_min: int = 6
             "end": {"dateTime": fin.isoformat(), "timeZone": "America/Mexico_City"},
         }
         service.events().insert(calendarId="primary", body=evento).execute()
-        ini_str = inicio.strftime("%d/%m a las %H:%M")
-        fin_str = fin.strftime("%H:%M")
-        return f"Listo, creé el evento «{title}» el {ini_str}, hasta las {fin_str}."
+        dia_sem = DIAS_SEM[inicio.weekday()]
+        ini_str = f"el {dia_sem} {inicio.day} de {MESES[inicio.month-1]} a las {_hora_12h(inicio)}"
+        fin_str = _hora_12h(fin)
+        return f"Listo, creé el evento «{title}» {ini_str}, hasta las {fin_str}."
     except Exception as e:
         return f"No pude crear el evento: {e}"

@@ -10,7 +10,7 @@ TOOLS = {
             "type": "function",
             "function": {
                 "name": "get_time",
-                "description": "Obtiene la hora actual. Úsala cuando Luis pregunte qué hora es.",
+                "description": "Obtiene la hora actual real del sistema. Úsala SIEMPRE que Luis pregunte la hora, qué hora es, o necesites la hora actual. No estimes la hora tú mismo.",
                 "parameters": {"type": "object", "properties": {}},
             },
         },
@@ -22,7 +22,7 @@ TOOLS = {
             "type": "function",
             "function": {
                 "name": "get_date",
-                "description": "Obtiene la fecha actual. Úsala cuando Luis pregunte qué día es o la fecha.",
+                "description": "Obtiene la fecha actual real del sistema. Úsala SIEMPRE que Luis pregunte el día, la fecha, qué día es, o necesites la fecha actual. No estimes la fecha tú mismo.",
                 "parameters": {"type": "object", "properties": {}},
             },
         },
@@ -171,17 +171,45 @@ TOOLS = {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string", "description": "Título del evento, ej. 'Reunión con Carlos'."},
-                        "when": {"type": "string", "description": "Cuándo, ej. 'mañana a las 3', 'el viernes a las 10'."},
-                        "duration_min": {"type": "integer", "description": "Duración en minutos (por defecto 60)."},
+                        "title": {"type": "string", "description": "Título del evento."},
+                        "day": {"type": "string", "description": "El día: 'hoy', 'mañana', 'domingo', 'el viernes', o una fecha."},
+                        "start_time": {"type": "string", "description": "Hora de inicio en formato 24h, ej. '11:30', '17:00'."},
+                        "end_time": {"type": "string", "description": "Hora de fin en formato 24h, ej. '14:00'. Opcional."},
                     },
-                    "required": ["title", "when"],
+                    "required": ["title", "day", "start_time"],
                 },
+            },
+        },
+    },
+    "get_datetime": {
+        "fn": system.get_datetime,
+        "requires_confirmation": False,
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "get_datetime",
+                "description": "Obtiene la fecha Y la hora actuales juntas. Úsala SIEMPRE que Luis pregunte el día, la fecha, la hora, o cualquier combinación. NUNCA respondas fecha u hora de memoria.",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
     },
 }
 
+# Tools cuyo resultado ya está listo para el usuario: se devuelve tal cual,
+# sin que el LLM lo reformule (evita que qwen cambie el formato o alucine).
+DIRECT_REPLY_TOOLS = {
+    "list_calendar_events",
+    "create_calendar_event",
+    "get_datetime",
+    "get_time",
+    "get_date",
+    "add_reminder",
+    "list_reminders",
+}
+
+
+def is_direct_reply(name: str) -> bool:
+    return name in DIRECT_REPLY_TOOLS
 
 def get_schemas() -> list[dict]:
     """Lista de esquemas para pasar a Ollama."""
